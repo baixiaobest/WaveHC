@@ -86,7 +86,8 @@ public:
   uint32_t errors;
     
   uint8_t playCount;
-    uint8_t remainingBytesInChunk2;
+  uint8_t remainingBytesInChunk2;
+  uint8_t debug;
 
 #if DVOLUME
   /** Software volume control. Reduce volume by 6 dB per step. See DAC ISR. */

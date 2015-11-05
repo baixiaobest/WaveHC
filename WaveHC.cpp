@@ -46,6 +46,7 @@ uint8_t sdstatus = 0;
 //------------------------------------------------------------------------------
 // timer interrupt for DAC
 ISR(TIMER1_COMPA_vect) {
+    
   if (!playing) return;
 
   if (playpos >= playend) {
@@ -139,8 +140,8 @@ ISR(TIMER1_COMPB_vect) {
 
   // enable interrupts while reading the SD
   sei();
-  
-  int16_t read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
+    
+  uint16_t read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
   
   cli();
   if (read > 0) {
@@ -157,6 +158,7 @@ ISR(TIMER1_COMPB_vect) {
 WaveHC::WaveHC(void) {
   fd = 0;
   playCount = 0;
+  debug = 0;
 }
 //------------------------------------------------------------------------------
 /**
@@ -410,33 +412,18 @@ void WaveHC::play(void) {
 
   playing = this;
 
-  // fill the play buffer
-  read = readWaveData(buffer1, PLAYBUFFLEN);
-  if (read <= 0) return;
-  playpos = buffer1;
-  playend = buffer1 + read;
-    
-//  if (playCount==2) {
-//      read = readWaveData2(buffer3, PLAYBUFFLEN);
-//      if (read <= 0) return;
-//      playpos2 = buffer3;
-//      playend2 = buffer3 + read;
-//  }
+//  // fill the play buffer
+//  read = readWaveData(buffer1, PLAYBUFFLEN);
+//  if (read <= 0) return;
+//  playpos = buffer1;
+//  playend = buffer1 + read;
+//
+//  // fill the second buffer
+//  read = readWaveData(buffer2, PLAYBUFFLEN);
+//  if (read < 0) return;
+//  sdbuff = buffer2;
+//  sdend = sdbuff + read;
 
-  // fill the second buffer
-  read = readWaveData(buffer2, PLAYBUFFLEN);
-  if (read < 0) return;
-  sdbuff = buffer2;
-  sdend = sdbuff + read;
-    
-//  if (playCount == 2) {
-//      putstring_nl("reading to buffer4");
-//      read = readWaveData2(buffer4, PLAYBUFFLEN);
-//      putstring_nl("reading finished");
-//      if (read < 0) return;
-//      sdbuff2 = buffer4;
-//      sdend2 = sdbuff2 + read;
-//  }
 
   sdstatus = SD_READY;
   
@@ -458,6 +445,10 @@ void WaveHC::play(void) {
   // Enable timer interrupt for DAC ISR
   TIMSK1 |= _BV(OCIE1A);
 }
+
+
+
+
 //------------------------------------------------------------------------------
 /** Read wave data.
  *
