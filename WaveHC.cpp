@@ -54,59 +54,59 @@ ISR(TIMER1_COMPA_vect) {
 
 
   if (playing){
-  if (playpos >= playend) {
-    if (sdstatus == SD_READY) {
+          if (playpos >= playend) {
+              if (sdstatus == SD_READY) {
     
-      // swap double buffers
-      playpos = sdbuff;
-      playend = sdend;
-      sdbuff = sdbuff != buffer1 ? buffer1 : buffer2;
+                  // swap double buffers
+                  playpos = sdbuff;
+                  playend = sdend;
+                  sdbuff = sdbuff != buffer1 ? buffer1 : buffer2;
       
-      sdstatus = SD_FILLING;
-      // interrupt to call SD reader
-	    TIMSK1 |= _BV(OCIE1B);
-        refillFlag = 0;
+                  sdstatus = SD_FILLING;
+                  // interrupt to call SD reader
+                  TIMSK1 |= _BV(OCIE1B);
+                  refillFlag = 0;
+              }
+              else if (sdstatus == SD_END_FILE) {
+                  playing->stop();
+                  return;
+              }
+              else {
+                  // count overrun error if not at end of file
+                  if (playing->remainingBytesInChunk) {
+                      playing->errors++;
+                  }
+                  return;
+              }
+          }
     }
-    else if (sdstatus == SD_END_FILE) {
-      playing->stop();
-      return;
-    }
-    else {
-      // count overrun error if not at end of file
-      if (playing->remainingBytesInChunk) {
-        playing->errors++;
-      }
-      return;
-    }
-  }
-  }
     
     if (playing2) {
-        if (playpos2 >= playend2) {
-            if (sdstatus == SD_READY) {
+            if (playpos2 >= playend2) {
+                if (sdstatus == SD_READY) {
                 
-                // swap double buffers
-                playpos2 = sdbuff2;
-                playend2 = sdend2;
-                sdbuff2 = sdbuff2 != buffer3 ? buffer3 : buffer4;
+                    // swap double buffers
+                    playpos2 = sdbuff2;
+                    playend2 = sdend2;
+                    sdbuff2 = sdbuff2 != buffer3 ? buffer3 : buffer4;
                 
-                sdstatus = SD_FILLING;
-                // interrupt to call SD reader
-                TIMSK1 |= _BV(OCIE1B);
-                refillFlag = 1;
-            }
-            else if (sdstatus == SD_END_FILE) {
-                playing2->stop();
-                return;
-            }
-            else {
-                // count overrun error if not at end of file
-                if (playing2->remainingBytesInChunk) {
-                    playing2->errors++;
+                    sdstatus = SD_FILLING;
+                    // interrupt to call SD reader
+                    TIMSK1 |= _BV(OCIE1B);
+                    refillFlag = 1;
                 }
-                return;
+                else if (sdstatus == SD_END_FILE) {
+                    playing2->stop();
+                    return;
+                }
+                else {
+                    // count overrun error if not at end of file
+                    if (playing2->remainingBytesInChunk) {
+                        playing2->errors++;
+                    }
+                    return;
+                }
             }
-        }
     }
 
   uint8_t dh(0), dl(0);
@@ -143,11 +143,11 @@ ISR(TIMER1_COMPA_vect) {
             playpos2++;
         }
     }
-    if (playing2&&!playing){
+    if (dh==0){
         dh = dh2;
         dl = dl2;
     }
-    if (playing&&playing2){
+    else if(dh2 !=0 ){
         dh = dh/2 + dh2/2;
         dl = dl/2 + dl2/2;
     }
@@ -355,7 +355,7 @@ uint8_t WaveHC::create(FatReader &f) {
  */
 uint8_t WaveHC::isPaused(void) {
   cli();
-  uint8_t rtn = isplaying && !(TIMSK1 & _BV(OCIE1A));
+  uint8_t rtn = isplaying && (id == 0? playing : playing2); //&& !(TIMSK1 & _BV(OCIE1A));
   sei();
   return rtn;
 }
@@ -365,7 +365,12 @@ uint8_t WaveHC::isPaused(void) {
  */
 void WaveHC::pause(void) {
   cli();
-  TIMSK1 &= ~_BV(OCIE1A); //disable DAC interrupt
+  //TIMSK1 &= ~_BV(OCIE1A); //disable DAC interrupt
+    if (id==0) {
+        playing = 0;
+    }else{
+        playing2 = 0;
+    }
   sei();
   fd->volume()->rawDevice()->readEnd(); // redo any partial read on resume
 }
@@ -482,7 +487,12 @@ int16_t WaveHC::readWaveData(uint8_t *buff, uint16_t len) {
 void WaveHC::resume(void) {
   cli();
   // enable DAC interrupt
-  if(isplaying) TIMSK1 |= _BV(OCIE1A);
+  if(isplaying){
+      if(id==0)
+          playing = this;
+      else
+          playing2 = this;
+  }
   sei();
 }
 //------------------------------------------------------------------------------
@@ -527,7 +537,14 @@ void WaveHC::setSampleRate(uint32_t samplerate) {
 //------------------------------------------------------------------------------
 /** Stop the player. */
 void WaveHC::stop(void) {
-  TIMSK1 &= ~_BV(OCIE1A);   // turn off interrupt
-  playing->isplaying = 0;
-  playing = 0;
+    if (id == 0) {
+        if (!playing2) TIMSK1 &= ~_BV(OCIE1A);
+        playing = 0;
+    }else{
+        if (!playing) TIMSK1 &= ~_BV(OCIE1A);
+        playing2 = 0;
+    }
+     // turn off interrupt
+  isplaying = 0;
+
 }
