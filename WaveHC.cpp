@@ -416,12 +416,12 @@ void WaveHC::play(void) {
   playpos = buffer1;
   playend = buffer1 + read;
     
-  if (playCount==2) {
-      read = readWaveData2(buffer3, PLAYBUFFLEN);
-      if (read <= 0) return;
-      playpos2 = buffer3;
-      playend2 = buffer3 + read;
-  }
+//  if (playCount==2) {
+//      read = readWaveData2(buffer3, PLAYBUFFLEN);
+//      if (read <= 0) return;
+//      playpos2 = buffer3;
+//      playend2 = buffer3 + read;
+//  }
 
   // fill the second buffer
   read = readWaveData(buffer2, PLAYBUFFLEN);
@@ -429,14 +429,14 @@ void WaveHC::play(void) {
   sdbuff = buffer2;
   sdend = sdbuff + read;
     
-  if (playCount == 2) {
-      putstring_nl("reading to buffer4");
-      read = readWaveData2(buffer4, PLAYBUFFLEN);
-      putstring_nl("reading finished");
-      if (read < 0) return;
-      sdbuff2 = buffer4;
-      sdend2 = sdbuff2 + read;
-  }
+//  if (playCount == 2) {
+//      putstring_nl("reading to buffer4");
+//      read = readWaveData2(buffer4, PLAYBUFFLEN);
+//      putstring_nl("reading finished");
+//      if (read < 0) return;
+//      sdbuff2 = buffer4;
+//      sdend2 = sdbuff2 + read;
+//  }
 
   sdstatus = SD_READY;
   
