@@ -22,7 +22,6 @@
 #endif // PLAYBUFFLEN
 
 WaveHC *playing = 0;
-WaveHC *playing2 = 0;
 
 uint8_t buffer1[PLAYBUFFLEN];
 uint8_t buffer2[PLAYBUFFLEN];
@@ -30,15 +29,6 @@ uint8_t *playend;      // end position for current buffer
 uint8_t *playpos;      // position of next sample
 uint8_t *sdbuff;       // SD fill buffer
 uint8_t *sdend;        // end of data in sd buffer
-
-uint8_t buffer3[PLAYBUFFLEN];
-uint8_t buffer4[PLAYBUFFLEN];
-uint8_t *playend2;      // end position for current buffer
-uint8_t *playpos2;      // position of next sample
-uint8_t *sdbuff2;       // SD fill buffer
-uint8_t *sdend2;        // end of data in sd buffer
-
-uint8_t globalID = 0;
 
 // status of sd
 #define SD_READY 1     // buffer is ready to be played
@@ -142,14 +132,8 @@ ISR(TIMER1_COMPB_vect) {
 
   // enable interrupts while reading the SD
   sei();
-
-    int16_t read=0;
-  if (globalID == 0)
-      read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
-    if (globalID == 1){
-        read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
-        //read = playing2->readWaveData(sdbuff2, PLAYBUFFLEN);
-    }
+  
+  int16_t read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
   
   cli();
   if (read > 0) {
@@ -163,13 +147,8 @@ ISR(TIMER1_COMPB_vect) {
 }
 //------------------------------------------------------------------------------
 /** create an instance of WaveHC. */
-WaveHC::WaveHC(uint8_t ID) {
+WaveHC::WaveHC(void) {
   fd = 0;
-    id = ID;
-    if (id > globalID) {
-        globalID = id;
-    }
-    
 }
 //------------------------------------------------------------------------------
 /**
@@ -318,13 +297,9 @@ void WaveHC::play(void) {
 
   int16_t read;
 
-  if (id == 0)
-      playing = this;
-  if (id == 1)
-      playing2 = this;
+  playing = this;
 
   // fill the play buffer
-  if (id == 0){
   read = readWaveData(buffer1, PLAYBUFFLEN);
   if (read <= 0) return;
   playpos = buffer1;
@@ -336,21 +311,6 @@ void WaveHC::play(void) {
   sdbuff = buffer2;
   sdend = sdbuff + read;
   sdstatus = SD_READY;
-  }else{
-      read = readWaveData(buffer3, PLAYBUFFLEN);
-      if (read <= 0) return;
-      playpos2 = buffer3;
-      playend2 = buffer3 + read;
-      
-      // fill the second buffer
-      read = readWaveData(buffer4, PLAYBUFFLEN);
-      if (read < 0) return;
-      sdbuff2 = buffer4;
-      sdend2 = sdbuff2 + read;
-      sdstatus = SD_READY;
-  
-  }
-  
   
   // its official!
   isplaying = 1;
