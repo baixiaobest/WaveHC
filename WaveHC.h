@@ -41,6 +41,8 @@
 #define PLAYBUFFLEN 512UL
 #endif //__AVR_ATmega168P__
 
+#define PLAYBUFFLEN 256UL
+
 // Define max allowed SD read rate in bytes/sec.
 #if PLAYBUFFLEN == 512UL && OPTIMIZE_CONTIGUOUS
 /** Maximum SD read rate for 512 byte buffer and contiguous file */
@@ -82,6 +84,8 @@ public:
   volatile uint8_t isplaying;
   /** Number of times data was not available from the SD in the DAC ISR */
   uint32_t errors;
+    
+    uint8_t id;
 
 #if DVOLUME
   /** Software volume control. Reduce volume by 6 dB per step. See DAC ISR. */
@@ -90,7 +94,7 @@ public:
   /** FatReader instance for current wave file. */
   FatReader* fd;
   
-  WaveHC(void);
+  WaveHC(uint8_t);
   uint8_t create(FatReader &f);
   /** Return the size of the WAV file */
   uint32_t getSize(void) {return fd->fileSize();}
