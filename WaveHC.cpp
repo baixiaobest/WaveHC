@@ -22,6 +22,7 @@
 #endif // PLAYBUFFLEN
 
 WaveHC *playing = 0;
+WaveHC *playing2 = 0;
 
 uint8_t buffer1[PLAYBUFFLEN];
 uint8_t buffer2[PLAYBUFFLEN];
@@ -36,6 +37,8 @@ uint8_t *playend2;      // end position for current buffer
 uint8_t *playpos2;      // position of next sample
 uint8_t *sdbuff2;       // SD fill buffer
 uint8_t *sdend2;        // end of data in sd buffer
+
+uint8_t globalID = 0;
 
 // status of sd
 #define SD_READY 1     // buffer is ready to be played
@@ -139,8 +142,14 @@ ISR(TIMER1_COMPB_vect) {
 
   // enable interrupts while reading the SD
   sei();
-  
-  int16_t read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
+
+    int16_t read=0;
+  if (globalID == 0)
+      read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
+    if (globalID == 1){
+        read = playing->readWaveData(sdbuff, PLAYBUFFLEN);
+        //read = playing2->readWaveData(sdbuff2, PLAYBUFFLEN);
+    }
   
   cli();
   if (read > 0) {
@@ -154,9 +163,13 @@ ISR(TIMER1_COMPB_vect) {
 }
 //------------------------------------------------------------------------------
 /** create an instance of WaveHC. */
-WaveHC::WaveHC(void) {
+WaveHC::WaveHC(uint8_t ID) {
   fd = 0;
-  playCount = 0;
+    id = ID;
+    if (id > globalID) {
+        globalID = id;
+    }
+    
 }
 //------------------------------------------------------------------------------
 /**
@@ -264,115 +277,12 @@ uint8_t WaveHC::create(FatReader &f) {
   errors = 0;
   isplaying = 0;
   remainingBytesInChunk = 0;
-  playCount++;
   
 #if DVOLUME
   volume = 0;
 #endif //DVOLUME
   // position to data
   return readWaveData(0, 0) < 0 ? false: true;
-}
-
-
-
-
-
-
-
-
-
-//-----------------------------------------------------------------------------
-/**
- * Add a new file to player and play it simultaneously with the previous file
- * Return true when success, false on failure
- */
-uint8_t WaveHC::addFile(FatReader &f){
-    if (playCount == 2) {
-        putstring_nl("Playing more than 2 files!");
-        return false;
-    }
-    if (playCount == 0) {
-        putstring_nl("pass to create");
-        return create(f);
-    }
-    
-    union {
-        struct {
-            char     id[4];
-            uint32_t size;
-            char     data[4];
-        } riff;  // riff chunk
-        struct {
-            uint16_t compress;
-            uint16_t channels;
-            uint32_t sampleRate;
-            uint32_t bytesPerSecond;
-            uint16_t blockAlign;
-            uint16_t bitsPerSample;
-            uint16_t extraBytes;
-        } fmt; // fmt data
-    } buf;
-    
-#if OPTIMIZE_CONTIGUOUS
-    // set optimized read for contiguous files
-    f.optimizeContiguous();
-#endif // OPTIMIZE_CONTIGUOUS
-    
-    // must start with WAVE header
-    if (f.read(&buf, 12) != 12
-        || strncmp(buf.riff.id, "RIFF", 4)
-        || strncmp(buf.riff.data, "WAVE", 4)) {
-        return false;
-    }
-    
-    // next chunk must be fmt
-    if (f.read(&buf, 8) != 8
-        || strncmp(buf.riff.id, "fmt ", 4)) {
-        return false;
-    }
-    
-    // fmt chunk size must be 16 or 18
-    uint16_t size = buf.riff.size;
-    if (size == 16 || size == 18) {
-        if (f.read(&buf, size) != (int16_t)size) {
-            return false;
-        }
-    }
-    else {
-        // compressed data - force error
-        buf.fmt.compress = 0;
-    }
-    
-    if (buf.fmt.compress != 1 || (size == 18 && buf.fmt.extraBytes != 0)) {
-        putstring_nl("Compression not supported");
-        return false;
-    }
-    
-    if (Channels != buf.fmt.channels){
-        putstring_nl("Not matching channels of previous file!");
-        return false;
-    }
-    
-    
-    if(BitsPerSample != buf.fmt.bitsPerSample){
-        putstring_nl("Not matching bit per sample of previous file");
-        return false;
-    }
-    
-    
-    if(dwSamplesPerSec != buf.fmt.sampleRate){
-        putstring_nl("Not matching sample rate of previous file");
-    }
-    
-    fd2 = &f;
-    playCount++;
-    remainingBytesInChunk2 = 0;
-    
-#if DVOLUME
-    volume = 0;
-#endif //DVOLUME
-    // position to data
-    return readWaveData2(0, 0) < 0 ? false: true;
 }
 //------------------------------------------------------------------------------
 /**
@@ -408,37 +318,39 @@ void WaveHC::play(void) {
 
   int16_t read;
 
-  playing = this;
+  if (id == 0)
+      playing = this;
+  if (id == 1)
+      playing2 = this;
 
   // fill the play buffer
+  if (id == 0){
   read = readWaveData(buffer1, PLAYBUFFLEN);
   if (read <= 0) return;
   playpos = buffer1;
   playend = buffer1 + read;
-    
-//  if (playCount==2) {
-//      read = readWaveData2(buffer3, PLAYBUFFLEN);
-//      if (read <= 0) return;
-//      playpos2 = buffer3;
-//      playend2 = buffer3 + read;
-//  }
 
   // fill the second buffer
   read = readWaveData(buffer2, PLAYBUFFLEN);
   if (read < 0) return;
   sdbuff = buffer2;
   sdend = sdbuff + read;
-    
-//  if (playCount == 2) {
-//      putstring_nl("reading to buffer4");
-//      read = readWaveData2(buffer4, PLAYBUFFLEN);
-//      putstring_nl("reading finished");
-//      if (read < 0) return;
-//      sdbuff2 = buffer4;
-//      sdend2 = sdbuff2 + read;
-//  }
-
   sdstatus = SD_READY;
+  }else{
+      read = readWaveData(buffer3, PLAYBUFFLEN);
+      if (read <= 0) return;
+      playpos2 = buffer3;
+      playend2 = buffer3 + read;
+      
+      // fill the second buffer
+      read = readWaveData(buffer4, PLAYBUFFLEN);
+      if (read < 0) return;
+      sdbuff2 = buffer4;
+      sdend2 = sdbuff2 + read;
+      sdstatus = SD_READY;
+  
+  }
+  
   
   // its official!
   isplaying = 1;
@@ -497,49 +409,6 @@ int16_t WaveHC::readWaveData(uint8_t *buff, uint16_t len) {
   if (ret > 0) remainingBytesInChunk -= ret;
   return ret;
 }
-
-
-
-
-
-
-
-int16_t WaveHC::readWaveData2(uint8_t *buff, uint16_t len) {
-    
-    if (remainingBytesInChunk2 == 0) {
-        struct {
-            char     id[4];
-            uint32_t size;
-        } header;
-        while (1) {
-            if (fd2->read(&header, 8) != 8)return -1;
-            if (!strncmp(header.id, "data", 4)) {
-                remainingBytesInChunk2 = header.size;
-                break;
-            }
-            
-            // if not "data" then skip it!
-            if (!fd2->seekCur(header.size)) {
-                putstring_nl("cannot find data");
-                return -1;
-            }
-        }
-    }
-    
-    // make sure buffers are aligned on SD sectors
-    uint16_t maxLen = PLAYBUFFLEN - fd2->readPosition() % PLAYBUFFLEN;
-    if (len > maxLen) len = maxLen;
-    
-    if (len > remainingBytesInChunk2) {
-        len = remainingBytesInChunk2;
-    }
-    
-    int16_t ret = fd2->read(buff, len);
-    if (ret > 0) remainingBytesInChunk2 -= ret;
-    return ret;
-}
-
-
 //------------------------------------------------------------------------------
 /** Resume a paused player. */
 void WaveHC::resume(void) {

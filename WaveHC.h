@@ -85,8 +85,7 @@ public:
   /** Number of times data was not available from the SD in the DAC ISR */
   uint32_t errors;
     
-  uint8_t playCount;
-    uint8_t remainingBytesInChunk2;
+    uint8_t id;
 
 #if DVOLUME
   /** Software volume control. Reduce volume by 6 dB per step. See DAC ISR. */
@@ -94,9 +93,8 @@ public:
 #endif // DVOLUME
   /** FatReader instance for current wave file. */
   FatReader* fd;
-  FatReader* fd2;
   
-  WaveHC(void);
+  WaveHC(uint8_t);
   uint8_t create(FatReader &f);
   /** Return the size of the WAV file */
   uint32_t getSize(void) {return fd->fileSize();}
@@ -108,8 +106,6 @@ public:
   void seek(uint32_t pos);
   void setSampleRate(uint32_t samplerate);
   void stop(void);
-  uint8_t addFile(FatReader &f);
-  int16_t readWaveData2(uint8_t *buff, uint16_t len);
 };
 
 #endif //WaveHC_h
